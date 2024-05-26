@@ -31,6 +31,12 @@ rocksdb_ldb --db=./olivedb put k1 v1 --create_if_missing
 rocksdb_ldb --db=./olivedb get k1
 ```
  
+Python Interface on MacOS
+```
+brew install rocksdb
+pip install git+https://github.com/gau-nernst/rocksdb-python.git
+```
+
 ## Usage
 
 ```sh
