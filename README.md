@@ -47,7 +47,15 @@ PORT=<port> ./master
 PORT=<port> ./volume
 ```
 
+### cURL
+```sh
+curl -X PUT -d bigswag localhost:9001/k1
+curl -X DELETE http://localhost:9001/k1
+curl -X GET http://localhost:9001/k1
+```
+
 ## TODO
-- rocksdb
-- port to rust if python isn't fast enough
-- fancy frontend in next + shadcn ui
+- [x] Use rocksdb
+- [ ] Port to rust if python isn't fast enough
+- [ ] Make fancy frontend in next + shadcn UI
+
