@@ -10,6 +10,7 @@ options.IncreaseParallelism()
 
 print('sup', os.environ['TYPE'])
 
+# *** Master Server ***
 if os.environ['TYPE'] == 'master':
   volumes = os.environ['VOLUMES'].split(',')
 
