@@ -57,8 +57,8 @@ PORT=<port> ./volume
 
 ### cURL
 ```sh
-curl -X PUT -d bigswag localhost:9000/k1 -vv
-curl -X DELETE http://localhost:9000/k1 -vv
+curl -X PUT -d bigswag http://localhost:9000/k1 -L -vv
+curl -X DELETE http://localhost:9000/k1 -L -vv
 curl -L GET http://localhost:9000/k1 -vv
 ```
 
