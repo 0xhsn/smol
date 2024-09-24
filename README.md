@@ -1,5 +1,13 @@
 # smol
-tiny key-value store
+Simple + tiny python-based key-value store.
+
+
+## Directory Overview
+- `olivedb`: where rocksdb (the database used for metadata storage by the master server) stores its data files.
+- `volume1`: this is where the volume server stores actual files. two-level directory structure to avoid having too many files in a single directory.
+  - 2 char (first layer deep): named based on the first two characters of an MD5 hash.
+  - 4 char (two layers deep): named based on the first four characters of the MD5 hash, providing a 
+  - Value file(s): file name corresponds to the full MD5 hash of a key. contains the actual data associated with that key. 
 
 ## Setup
 ### rocksdb
@@ -9,7 +17,7 @@ tiny key-value store
 This tool is used to dump the contents of a RocksDB database.
 
 ```sh
-rocksdb_dump --db=<path_to_your_db>
+rocksdb_dump --db_path ~/Developer/smol/olivedb --dump_location livedb_dump.txt
 ```
 
 2.	rocksdb_ldb:
@@ -56,6 +64,7 @@ curl -L GET http://localhost:9000/k1 -vv
 
 ## TODO
 - [x] Use rocksdb
-- [ ] Port to rust if python isn't fast enough
-- [ ] Make fancy frontend in next + shadcn UI
-
+- [ ] Port to rust?
+- [ ] Dockerize
+- [ ] Integrate ElasticSearch
+  - [ ] Good use case for log aggregation and monitoring?: can be used to store logs from multiple services or applications. Handle large amounts of small files (logs) where they need to be ingested, stored, and queried later.
