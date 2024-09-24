@@ -1,5 +1,5 @@
 import os
-from rocksdb_python import Options, PyDB, ReadOptions, WriteOptions
+from rocksdb_python import Options, PyDB, ReadOptions
 import json
 import socket
 import hashlib
@@ -20,35 +20,30 @@ if os.environ['TYPE'] == 'master':
   db = PyDB(options, "./olivedb")
 
 def master(env, start_response):
-    key = env['REQUEST_URI']
-    try:
-        metakey = db.Get(ReadOptions(), key.encode('utf-8'))
-    except RuntimeError as e:
-        if 'NotFound' in str(e):
-            metakey = None
-        else:
-            raise
-            
-    if metakey is None:
-        if env['REQUEST_METHOD'] == 'PUT':
-            # TODO: make it smarter
-            volume = random.choice(volumes)
+  key = env['REQUEST_URI']
+  metakey = db.Get(ReadOptions(), key.encode('utf-8'))
 
-            # save volume to database
-            meta = {"volume": volume}
-            db.Put(WriteOptions(), key.encode('utf-8'), json.dumps(meta).encode('utf-8'))
-        else:
-            start_response('404 Not Found', [('Content-type', 'text/plain')])
-            return [b'key not found']
+  if metakey is None:
+    if env['REQUEST_METHOD'] == 'PUT':
+        # TODO: make it smarter
+        volume = random.choice(volumes)
+        
+        # save volume to database
+        meta = {"volume": volume}
+        db.put(key.encode('utf-8'), json.dumps(meta).encode('utf-8'))
     else:
-        meta = json.loads(metakey.decode('utf-8'))
+      # this key doesn't exist and we aren't trying to create it
+      start_response('404 Not Found', [('Content-type', 'text/plain')])
+      return [b'key not found']
+  else:
+      meta = json.loads(metakey.decode('utf-8'))
 
-    # send redirect
-    print(meta)
-    volume = meta['volume']
-    headers = [('Location', 'http://%s%s' % (volume, key))]
-    start_response('307 Temporary Redirect', headers)
-    return [b""]
+  # send redirect to volume server for GET + PUT + DELETE
+  print(meta)
+  volume = meta['volume']
+  headers = [('Location', 'http://%s%s' % (volume, key))]
+  start_response('307 Temporary Redirect', headers)
+  return [b""]
 
 # *** Volume Server ***
 
@@ -62,10 +57,8 @@ class FileCache(object):
     # must be MD5 hash
     assert len(key) == 32
 
-    # 2 layers deep in nginx world
     path = self.basedir+"/"+key[0:2]+"/"+key[0:4]
     if not os.path.isdir(path) and mkdir_ok:
-      # exist ok is fine, could be a race
       os.makedirs(path, exist_ok=True)
 
     return os.path.join(path, key)
@@ -85,8 +78,6 @@ class FileCache(object):
 
 if os.environ['TYPE'] == "volume":
   host = socket.gethostname()
-
-  # create the filecache
   fc = FileCache(os.environ['VOLUME'])
 
 def volume(env, start_response):
@@ -96,7 +87,6 @@ def volume(env, start_response):
 
   if env['REQUEST_METHOD'] == 'GET':
     if not fc.exists(hkey):
-      # key not in the FileCache
       start_response('404 Not Found', [('Content-type', 'text/plain')])
       return [b'key not found']
     start_response('200 OK', [('Content-type', 'text/plain')])
@@ -104,13 +94,16 @@ def volume(env, start_response):
 
   if env['REQUEST_METHOD'] == 'PUT':
     flen = int(env.get('CONTENT_LENGTH', '0'))
+    print(f"Content length: {flen}")
     if flen > 0:
-      fc.put(hkey, env['wsgi.input'].read(flen))
-      start_response('200 OK', [('Content-type', 'text/plain')])
-      return [b'']
+        data = env['wsgi.input'].read(flen)
+        print(f"Data received: {data}")
+        fc.put(hkey, data)
+        start_response('200 OK', [('Content-type', 'text/plain')])
+        return [b'']
     else:
-      start_response('411 Length Required', [('Content-type', 'text/plain')])
-      return [b'']
+        start_response('411 Length Required', [('Content-type', 'text/plain')])
+        return [b'']
 
   if env['REQUEST_METHOD'] == 'DELETE':
     fc.delete(hkey)
