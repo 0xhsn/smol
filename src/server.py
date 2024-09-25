@@ -10,6 +10,10 @@ options.IncreaseParallelism()
 
 print('sup', os.environ['TYPE'])
 
+def resp(start_response, code, headers=[('Content-type', 'text/plain')], body=b''):
+  start_response(code, headers)
+  return [body]
+
 # *** Master Server ***
 if os.environ['TYPE'] == 'master':
   volumes = os.environ['VOLUMES'].split(',')
@@ -28,13 +32,11 @@ def master(env, start_response):
         # TODO: make it smarter
         volume = random.choice(volumes)
         
-        # save volume to database
+        # Save volume to database
         meta = {"volume": volume}
         db.put(key.encode('utf-8'), json.dumps(meta).encode('utf-8'))
     else:
-      # this key doesn't exist and we aren't trying to create it
-      start_response('404 Not Found', [('Content-type', 'text/plain')])
-      return [b'key not found']
+      resp(start_response, '404 Not Found', body=b'key not found')
   else:
       meta = json.loads(metakey.decode('utf-8'))
 
@@ -42,8 +44,7 @@ def master(env, start_response):
   print(meta)
   volume = meta['volume']
   headers = [('Location', 'http://%s%s' % (volume, key))]
-  start_response('307 Temporary Redirect', headers)
-  return [b""]
+  return resp(start_response, '307 Temporary Redirect', headers=headers)
 
 # *** Volume Server ***
 
@@ -54,7 +55,7 @@ class FileCache(object):
     print("FileCache in %s" % basedir)
 
   def k2p(self, key, mkdir_ok=False):
-    # must be MD5 hash
+    # Must be MD5 hash
     assert len(key) == 32
 
     path = self.basedir+"/"+key[0:2]+"/"+key[0:4]
@@ -85,25 +86,21 @@ def volume(env, start_response):
   hkey = hashlib.md5(key).hexdigest()
   print(hkey)
 
-  if env['REQUEST_METHOD'] == 'GET':
-    if not fc.exists(hkey):
-      start_response('404 Not Found', [('Content-type', 'text/plain')])
-      return [b'key not found']
-    start_response('200 OK', [('Content-type', 'text/plain')])
-    return [fc.get(hkey)]
-
   if env['REQUEST_METHOD'] == 'PUT':
     flen = int(env.get('CONTENT_LENGTH', '0'))
-    print(f"Content length: {flen}")
     if flen > 0:
         data = env['wsgi.input'].read(flen)
-        print(f"Data received: {data}")
         fc.put(hkey, data)
-        start_response('200 OK', [('Content-type', 'text/plain')])
-        return [b'']
+        return resp(start_response, '201 Created', body=b'')
     else:
-        start_response('411 Length Required', [('Content-type', 'text/plain')])
-        return [b'']
+        return resp(start_response, '411 Length Required', body=b'content length required')
+  
+  if not fc.exists(hkey):
+    return resp(start_response, '404 Not Found', body=b'key not found')
+  
+  if env['REQUEST_METHOD'] == 'GET':
+    return resp(start_response, '200 OK', body=fc.get(hkey))
 
   if env['REQUEST_METHOD'] == 'DELETE':
     fc.delete(hkey)
+    return resp(start_response, '200 OK', body=b'') 
